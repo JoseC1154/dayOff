@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#0b1220" />
+  <title>Day-Off 30-Day Calculator</title>
+
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="header">
+    <h1>Day-Off Request Calculator</h1>
+    <p>30 days in advance + 2-day early reminder</p>
+  </header>
+
+  <main class="wrap">
+    <section class="card">
+      <h2>Submit today → What day-off date does that allow?</h2>
+      <div class="grid">
+        <div class="field">
+          <label>Today</label>
+          <input id="today" type="date" />
+        </div>
+
+        <div class="result">
+          <div class="k">Day-off date (today + 30)</div>
+          <div class="v" id="todayPlus30">—</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Pick a day-off date → When must you submit?</h2>
+
+      <div class="grid">
+        <div class="field">
+          <label>Day-off date</label>
+          <input id="dayOffDate" type="date" />
+        </div>
+
+        <div class="result">
+          <div class="k">Submit by (day off − 30)</div>
+          <div class="v" id="submitBy">—</div>
+        </div>
+
+        <div class="result">
+          <div class="k">Early reminder (day off − 32)</div>
+          <div class="v" id="earlyReminder">—</div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <input id="label" type="text" placeholder="Label (optional) e.g., 'Family trip'" />
+        <button id="saveBtn" type="button">Save this day-off date</button>
+      </div>
+
+      <p class="hint">
+        Tip: Saved items stay on this device using localStorage (no login needed).
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>Saved dates</h2>
+      <div id="savedList" class="list"></div>
+      <div class="actions">
+        <button id="clearAllBtn" class="danger" type="button">Clear all saved</button>
+      </div>
+    </section>
+
+    <section class="card small">
+      <h2>Install</h2>
+      <p>
+        On mobile/desktop browser: use <b>Add to Home Screen</b> / <b>Install app</b>.
+        Works offline after first load.
+      </p>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span id="status">Ready</span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
