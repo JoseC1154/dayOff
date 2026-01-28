@@ -143,6 +143,16 @@ button.danger {
   gap: 8px;
   flex-wrap: wrap;
 }
+.settingsGrid { margin-top: 6px; }
+.exportRow { grid-template-columns: 1fr; }
+
+@media (min-width: 700px) {
+  .exportRow {
+    grid-template-columns: 1fr auto auto auto;
+    align-items: center;
+  }
+}
+
 
 .footer {
   position: fixed;
