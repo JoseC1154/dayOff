@@ -43,14 +43,14 @@
       </div>
     </section>
 
-    <section class="card">
-      <h2>Saved dates</h2>
-      <div id="savedList" class="list"></div>
+  <section class="card">
+    <h2>Saved</h2>
+    <p class="muted">Your saved day-off dates are stored on this device.</p>
+    <div class="row">
+      <button id="openSaved" type="button">Open Saved Dates</button>
+    </div>
+  </section>
 
-      <div class="row">
-        <button class="danger" id="clearAllBtn" type="button">Clear all saved</button>
-      </div>
-    </section>
 
     <footer class="footer">
       <span id="status">Ready</span>
@@ -104,6 +104,25 @@
         <label>Day-off date</label>
         <input id="dayOffDate" type="date" />
       </div>
+
+      <!-- Modal: Saved Dates -->
+<section class="modal" id="modalSaved" role="dialog" aria-modal="true" aria-labelledby="savedTitle" hidden>
+  <div class="modalHeader">
+    <div>
+      <div class="modalTitle" id="savedTitle">Saved Dates</div>
+      <div class="modalSub muted">Tap Open to view deadlines and exports</div>
+    </div>
+    <button class="iconBtn" data-close aria-label="Close modal" title="Close">✕</button>
+  </div>
+
+  <div class="modalBody">
+    <div id="savedList" class="list"></div>
+
+    <div class="row rowWrap">
+      <button id="clearAllBtn" class="danger" type="button">Clear all saved</button>
+    </div>
+  </div>
+</section>
 
          <div class="heroResult" aria-live="polite">
       <div class="heroLabel">Submit your request by</div>
