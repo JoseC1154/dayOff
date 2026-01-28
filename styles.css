@@ -272,3 +272,29 @@ input[type="date"], input[type="text"], input[type="number"]{
 
 .row{display:flex; gap:10px; align-items:center}
 .rowWrap{flex-wrap:wrap}
+
+/* Toast notification */
+.toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: rgba(18,26,43,0.98);
+  border: 1px solid rgba(122,162,255,0.35);
+  border-radius: 14px;
+  padding: 14px 20px;
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+  z-index: 100;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  opacity: 0;
+  transition: all 0.3s ease;
+  max-width: calc(100vw - 40px);
+  text-align: center;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}

@@ -2,61 +2,7 @@
 
 const $ = (id) => document.getElementById(id);
 
-const els = {
-  // Home buttons / gear
-  btnSubmitToday: $("btnSubmitToday"),
-  btnPickDayOff: $("btnPickDayOff"),
-  openSettings: $("openSettings"),
-  status: $("status"),
-  ruleText: $("ruleText"),
-
-  // Backdrop + modals
-  backdrop: $("backdrop"),
-  modalSubmitToday: $("modalSubmitToday"),
-  modalPickDayOff: $("modalPickDayOff"),
-  modalSettings: $("modalSettings"),
-
-  // Modal: Submit Today
-  today: $("today"),
-  todayPlusAdvance: $("todayPlusAdvance"),
-  exportDayOffFromTodayBtn: $("exportDayOffFromTodayBtn"),
-  submitRuleText: $("submitRuleText"),
-
-  // Submit Today hero
-todayPlusAdvanceHero: $("todayPlusAdvanceHero"),
-todayPlusAdvanceSub: $("todayPlusAdvanceSub"),
-
-// Pick Day Off hero
-submitByHero: $("submitByHero"),
-submitBySub: $("submitBySub"),
-
-
-  // Modal: Pick Day Off
-  dayOffDate: $("dayOffDate"),
-  submitBy: $("submitBy"),
-  earlyReminder: $("earlyReminder"),
-  label: $("label"),
-  saveBtn: $("saveBtn"),
-  exportDayOffBtn: $("exportDayOffBtn"),
-  exportSubmitByBtn: $("exportSubmitByBtn"),
-  exportEarlyBtn: $("exportEarlyBtn"),
-  pickRuleText: $("pickRuleText"),
-
-  // Settings modal
-  advanceDays: $("advanceDays"),
-  earlyExtraDays: $("earlyExtraDays"),
-  earlyOffsetText: $("earlyOffsetText"),
-  saveSettingsBtn: $("saveSettingsBtn"),
-  resetSettingsBtn: $("resetSettingsBtn"),
-
-  // Saved list
-  savedList: $("savedList"),
-  clearAllBtn: $("clearAllBtn"),
-  
-  openSaved: $("openSaved"),
-  modalSaved: $("modalSaved"),
-
-};
+let els = {};
 
 const STORAGE_KEY = "dayoff_saved_v1";
 const SETTINGS_KEY = "dayoff_settings_v1";
@@ -66,6 +12,22 @@ const DEFAULT_SETTINGS = { advanceDays: 30, earlyExtraDays: 2 };
 /* ---------- utils ---------- */
 function setStatus(msg) { els.status.textContent = msg; }
 function pad2(n){ return String(n).padStart(2,"0"); }
+
+function showToast(message, duration = 3000){
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  
+  // Trigger animation
+  setTimeout(() => toast.classList.add('show'), 10);
+  
+  // Remove after duration
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
 
 function toInputDateValue(date){
   const y=date.getFullYear();
@@ -165,16 +127,52 @@ function computeFromDayOff(){
     return;
   }
 
+  // Validation: Check if date meets minimum notice requirement
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Check if date is in the past
+  if(dayOff < today){
+    showToast("⚠️ This date has already passed", 4000);
+    els.submitByHero.textContent = "⚠️ Date passed";
+    els.submitBySub.textContent = "Please select a future date";
+    els.earlyReminder.textContent = "—";
+    return;
+  }
+  
+  const minDaysAhead = 14; // Minimum 14 days advance notice
+  const minDate = addDays(today, minDaysAhead);
+  
+  if(dayOff < minDate){
+    showToast(`⚠️ Missed day-off request window (minimum ${minDaysAhead} days notice)`, 4000);
+    els.submitByHero.textContent = "⚠️ Missed window";
+    els.submitBySub.textContent = `Select a date on or after ${toInputDateValue(minDate)}`;
+    els.earlyReminder.textContent = "—";
+    return;
+  }
+
   const submitBy = addDays(dayOff, -s.advanceDays);
   const earlyOffset = s.advanceDays + s.earlyExtraDays;
   const early = addDays(dayOff, -earlyOffset);
 
+  // Check if early reminder window was missed
+  const earlyReminderDaysAhead = earlyOffset; // e.g., 32 days
+  const earlyWindowMissed = dayOff < addDays(today, earlyReminderDaysAhead);
+  
+  if(earlyWindowMissed){
+    showToast(`⚠️ Early reminder window missed (${earlyReminderDaysAhead} days). Submit by deadline still valid.`, 5000);
+  }
+
   // HERO: Submit-by
   els.submitByHero.textContent = fmtLong(submitBy);
-  els.submitBySub.textContent = `${toInputDateValue(submitBy)} (deadline)`;
+  els.submitBySub.textContent = `${s.advanceDays} days before day-off (deadline)`;
 
   // Secondary: Early reminder
-  els.earlyReminder.textContent = `${fmtLong(early)} (${toInputDateValue(early)})`;
+  if(earlyWindowMissed){
+    els.earlyReminder.textContent = `⚠️ Missed: ${fmtLong(early)}`;
+  } else {
+    els.earlyReminder.textContent = `${fmtLong(early)} (${toInputDateValue(early)})`;
+  }
 }
 
 
@@ -319,12 +317,13 @@ function addSavedItem(dayOffStr, label){
   const id = crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
 
   const exists = items.some(x => x.dayOff === dayOffStr && (x.label||"") === (label||""));
-  if(exists){ setStatus("That saved item already exists."); return; }
+  if(exists){ setStatus("That saved item already exists."); return false; }
 
   items.push({ id, dayOff: dayOffStr, label: label || "" });
   saveSaved(items);
   renderSaved();
   setStatus("Saved.");
+  return true;
 }
 
 function deleteSavedItem(id){
@@ -368,9 +367,16 @@ function renderSaved(){
   // Empty state message
   if(items.length === 0){
     els.savedList.innerHTML = `
-      <div class="item">
-        <div class="itemTitle">Nothing saved yet</div>
-        <div class="itemMeta">Save a day-off date in “Pick a day-off date” to see it here.</div>
+      <div class="item" style="text-align: center; padding: 2rem 1rem;">
+        <div class="itemTitle" style="font-size: 1.2rem; margin-bottom: 1rem;">📋 No saved dates yet</div>
+        <div class="itemMeta" style="margin-bottom: 0.5rem;">To save your first date:</div>
+        <div class="itemMeta" style="text-align: left; max-width: 400px; margin: 1rem auto;">
+          <div style="margin: 0.5rem 0;">1️⃣ Click <strong>"Pick a day-off date"</strong> on the home screen</div>
+          <div style="margin: 0.5rem 0;">2️⃣ Select your desired day-off date</div>
+          <div style="margin: 0.5rem 0;">3️⃣ Add an optional label (e.g., "Family trip")</div>
+          <div style="margin: 0.5rem 0;">4️⃣ Click the <strong>"Save"</strong> button</div>
+        </div>
+        <div class="itemMeta" style="margin-top: 1rem;">Your saved dates will appear here!</div>
       </div>
     `;
     return;
@@ -416,6 +422,61 @@ function registerSW(){
 
 /* ---------- wiring ---------- */
 function init(){
+  // Initialize element references
+  els = {
+    // Home buttons / gear
+    btnSubmitToday: $("btnSubmitToday"),
+    btnPickDayOff: $("btnPickDayOff"),
+    openSettings: $("openSettings"),
+    status: $("status"),
+    ruleText: $("ruleText"),
+
+    // Backdrop + modals
+    backdrop: $("backdrop"),
+    modalSubmitToday: $("modalSubmitToday"),
+    modalPickDayOff: $("modalPickDayOff"),
+    modalSettings: $("modalSettings"),
+    modalSaved: $("modalSaved"),
+
+    // Modal: Submit Today
+    today: $("today"),
+    todayPlusAdvance: $("todayPlusAdvance"),
+    exportDayOffFromTodayBtn: $("exportDayOffFromTodayBtn"),
+    submitRuleText: $("submitRuleText"),
+
+    // Submit Today hero
+    todayPlusAdvanceHero: $("todayPlusAdvanceHero"),
+    todayPlusAdvanceSub: $("todayPlusAdvanceSub"),
+
+    // Pick Day Off hero
+    submitByHero: $("submitByHero"),
+    submitBySub: $("submitBySub"),
+
+    // Modal: Pick Day Off
+    dayOffDate: $("dayOffDate"),
+    submitBy: $("submitBy"),
+    earlyReminder: $("earlyReminder"),
+    label: $("label"),
+    saveBtn: $("saveBtn"),
+    exportDayOffBtn: $("exportDayOffBtn"),
+    exportSubmitByBtn: $("exportSubmitByBtn"),
+    exportEarlyBtn: $("exportEarlyBtn"),
+    pickRuleText: $("pickRuleText"),
+
+    // Settings modal
+    advanceDays: $("advanceDays"),
+    earlyExtraDays: $("earlyExtraDays"),
+    earlyOffsetText: $("earlyOffsetText"),
+    saveSettingsBtn: $("saveSettingsBtn"),
+    resetSettingsBtn: $("resetSettingsBtn"),
+
+    // Saved list
+    savedList: $("savedList"),
+    clearAllBtn: $("clearAllBtn"),
+    
+    openSaved: $("openSaved"),
+  };
+
   applySettingsToUI();
 
   // default today
@@ -498,8 +559,40 @@ function init(){
   // save day off
   els.saveBtn.addEventListener("click", () => {
     const dayOffStr = els.dayOffDate.value;
-    if(!dayOffStr) return setStatus("Pick a day-off date first.");
-    addSavedItem(dayOffStr, els.label.value);
+    
+    if(!dayOffStr){
+      showToast("⚠️ Please select a day-off date first");
+      setStatus("Pick a day-off date first.");
+      return;
+    }
+    
+    // Validate date range before saving
+    const dayOff = parseInputDate(dayOffStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Check if date is in the past
+    if(dayOff < today){
+      showToast("⚠️ Cannot save: This date has already passed", 4000);
+      return;
+    }
+    
+    const minDate = addDays(today, 14); // Minimum 14 days advance notice
+    
+    if(dayOff < minDate){
+      showToast("⚠️ Cannot save: Missed day-off request window (minimum 14 days notice)", 4000);
+      return;
+    }
+    
+    const success = addSavedItem(dayOffStr, els.label.value);
+    
+    if(success){
+      closeModal();
+      showToast("✓ Date saved successfully! Click folder icon to view.", 4000);
+      setStatus("Date saved. Click folder icon to view.");
+    } else {
+      showToast("⚠️ This date is already saved");
+    }
   });
 
   // saved list actions
