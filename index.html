@@ -9,123 +9,160 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
-  <header class="header">
-    <h1>Day-Off Request Calculator</h1>
-    <p><span id="ruleText">30 days in advance + 2-day early reminder</span></p>
+  <header class="topbar">
+    <div class="brand">
+      <div class="title">Day-Off Calculator</div>
+      <div class="subtitle" id="ruleText">30 days in advance + 2-day early reminder</div>
+    </div>
+
+    <button class="iconBtn" id="openSettings" aria-label="Open settings" title="Settings">
+      <!-- Gear icon (inline SVG) -->
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+        <path fill="currentColor" d="M19.14,12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.11-.2-.36-.28-.57-.2l-2.39.96c-.5-.38-1.04-.69-1.62-.92l-.36-2.54c-.03-.22-.22-.39-.45-.39h-3.84c-.23,0-.42.17-.45.39l-.36,2.54c-.58.23-1.12.54-1.62.92l-2.39-.96c-.21-.08-.46,0-.57.2l-1.92,3.32c-.11.2-.06.47.12.61l2.03,1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03,1.58c-.18.14-.23.41-.12.61l1.92,3.32c.11.2.36.28.57.2l2.39-.96c.5.38,1.04.69,1.62.92l.36,2.54c.03.22.22.39.45.39h3.84c.23,0,.42-.17.45-.39l.36-2.54c.58-.23,1.12-.54,1.62-.92l2.39.96c.21.08.46,0,.57-.2l1.92-3.32c.11-.2.06-.47-.12-.61l-2.03-1.58ZM12,15.5A3.5,3.5,0,1,1,15.5,12,3.5,3.5,0,0,1,12,15.5Z"/>
+      </svg>
+    </button>
   </header>
 
-  <main class="wrap">
-    <!-- SETTINGS -->
+  <main class="home">
+    <section class="hero card">
+      <h1>What do you want to do?</h1>
+      <p class="muted">Pick an option. We’ll show the right calculator in a modal.</p>
+
+      <div class="choiceRow">
+        <button class="bigBtn" id="btnSubmitToday">
+          <span class="bigBtnTitle">Submit today</span>
+          <span class="bigBtnSub">See the day-off date you qualify for</span>
+        </button>
+
+        <button class="bigBtn" id="btnPickDayOff">
+          <span class="bigBtnTitle">Pick a day-off date</span>
+          <span class="bigBtnSub">See submit-by + early reminder dates</span>
+        </button>
+      </div>
+    </section>
+
     <section class="card">
-      <h2>Settings</h2>
-      <div class="grid settingsGrid">
-        <div class="field">
-          <label>Days in advance (policy)</label>
-          <input id="advanceDays" type="number" min="0" step="1" inputmode="numeric" />
-        </div>
+      <h2>Saved dates</h2>
+      <div id="savedList" class="list"></div>
 
-        <div class="field">
-          <label>Extra early days (reminder)</label>
-          <input id="earlyExtraDays" type="number" min="0" step="1" inputmode="numeric" />
-        </div>
+      <div class="row">
+        <button class="danger" id="clearAllBtn" type="button">Clear all saved</button>
+      </div>
+    </section>
 
-        <div class="result">
-          <div class="k">Early reminder offset</div>
-          <div class="v" id="earlyOffsetText">—</div>
-        </div>
+    <footer class="footer">
+      <span id="status">Ready</span>
+    </footer>
+  </main>
+
+  <!-- Backdrop -->
+  <div class="backdrop" id="backdrop" hidden></div>
+
+  <!-- Modal: Submit Today -->
+  <section class="modal" id="modalSubmitToday" role="dialog" aria-modal="true" aria-labelledby="submitTitle" hidden>
+    <div class="modalHeader">
+      <div>
+        <div class="modalTitle" id="submitTitle">Submit today</div>
+        <div class="modalSub muted" id="submitRuleText">—</div>
+      </div>
+      <button class="iconBtn" data-close aria-label="Close modal" title="Close">✕</button>
+    </div>
+
+    <div class="modalBody">
+      <div class="field">
+        <label>Today</label>
+        <input id="today" type="date" />
       </div>
 
-      <div class="actions">
+      <div class="resultBox">
+        <div class="k">Day-off date (today + advance)</div>
+        <div class="v" id="todayPlusAdvance">—</div>
+      </div>
+
+      <div class="row">
+        <button id="exportDayOffFromTodayBtn" type="button">Export Day-off (.ics)</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Modal: Pick Day Off -->
+  <section class="modal" id="modalPickDayOff" role="dialog" aria-modal="true" aria-labelledby="pickTitle" hidden>
+    <div class="modalHeader">
+      <div>
+        <div class="modalTitle" id="pickTitle">Pick a day-off date</div>
+        <div class="modalSub muted" id="pickRuleText">—</div>
+      </div>
+      <button class="iconBtn" data-close aria-label="Close modal" title="Close">✕</button>
+    </div>
+
+    <div class="modalBody">
+      <div class="field">
+        <label>Day-off date</label>
+        <input id="dayOffDate" type="date" />
+      </div>
+
+      <div class="resultBox">
+        <div class="k">Submit by (day off − advance)</div>
+        <div class="v" id="submitBy">—</div>
+      </div>
+
+      <div class="resultBox">
+        <div class="k">Early reminder (day off − (advance + extra))</div>
+        <div class="v" id="earlyReminder">—</div>
+      </div>
+
+      <div class="field">
+        <label>Label (optional)</label>
+        <input id="label" type="text" placeholder="e.g., Family trip" />
+      </div>
+
+      <div class="row rowWrap">
+        <button id="saveBtn" type="button">Save</button>
+        <button id="exportDayOffBtn" type="button">Day-off .ics</button>
+        <button id="exportSubmitByBtn" type="button">Submit-by .ics</button>
+        <button id="exportEarlyBtn" type="button">Early .ics</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Modal: Settings -->
+  <section class="modal" id="modalSettings" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" hidden>
+    <div class="modalHeader">
+      <div>
+        <div class="modalTitle" id="settingsTitle">Settings</div>
+        <div class="modalSub muted">Saved on this device</div>
+      </div>
+      <button class="iconBtn" data-close aria-label="Close modal" title="Close">✕</button>
+    </div>
+
+    <div class="modalBody">
+      <div class="field">
+        <label>Days in advance (policy)</label>
+        <input id="advanceDays" type="number" min="0" step="1" inputmode="numeric" />
+      </div>
+
+      <div class="field">
+        <label>Extra early days (reminder)</label>
+        <input id="earlyExtraDays" type="number" min="0" step="1" inputmode="numeric" />
+      </div>
+
+      <div class="resultBox">
+        <div class="k">Early reminder offset</div>
+        <div class="v" id="earlyOffsetText">—</div>
+      </div>
+
+      <div class="row rowWrap">
         <button id="saveSettingsBtn" type="button">Save settings</button>
         <button id="resetSettingsBtn" class="danger" type="button">Reset defaults</button>
       </div>
 
-      <p class="hint">
-        Settings are saved to this device (localStorage).
+      <p class="muted small">
+        Early reminder = day-off − (advanceDays + earlyExtraDays)
       </p>
-    </section>
-
-    <!-- TODAY => DAY OFF -->
-    <section class="card">
-      <h2>Submit today → What day-off date does that allow?</h2>
-      <div class="grid">
-        <div class="field">
-          <label>Today</label>
-          <input id="today" type="date" />
-        </div>
-
-        <div class="result">
-          <div class="k">Day-off date (today + advance)</div>
-          <div class="v" id="todayPlusAdvance">—</div>
-        </div>
-
-        <div class="result">
-          <div class="k">Calendar export</div>
-          <div class="v">
-            <button id="exportDayOffFromTodayBtn" type="button">Export Day-off (.ics)</button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- DAY OFF => DEADLINES -->
-    <section class="card">
-      <h2>Pick a day-off date → When must you submit?</h2>
-
-      <div class="grid">
-        <div class="field">
-          <label>Day-off date</label>
-          <input id="dayOffDate" type="date" />
-        </div>
-
-        <div class="result">
-          <div class="k">Submit by (day off − advance)</div>
-          <div class="v" id="submitBy">—</div>
-        </div>
-
-        <div class="result">
-          <div class="k">Early reminder (day off − (advance + extra))</div>
-          <div class="v" id="earlyReminder">—</div>
-        </div>
-      </div>
-
-      <div class="actions exportRow">
-        <input id="label" type="text" placeholder="Label (optional) e.g., 'Family trip'" />
-        <button id="saveBtn" type="button">Save this day-off date</button>
-      </div>
-
-      <div class="actions exportRow">
-        <button id="exportDayOffBtn" type="button">Export Day-off (.ics)</button>
-        <button id="exportSubmitByBtn" type="button">Export Submit-by (.ics)</button>
-        <button id="exportEarlyBtn" type="button">Export Early reminder (.ics)</button>
-      </div>
-
-      <p class="hint">
-        Calendar exports download a file you can open to add the reminder to Apple/Google Calendar.
-      </p>
-    </section>
-
-    <!-- SAVED -->
-    <section class="card">
-      <h2>Saved dates</h2>
-      <div id="savedList" class="list"></div>
-      <div class="actions">
-        <button id="clearAllBtn" class="danger" type="button">Clear all saved</button>
-      </div>
-    </section>
-
-    <section class="card small">
-      <h2>Install</h2>
-      <p>
-        Use <b>Install app</b> / <b>Add to Home Screen</b>. Works offline after first load.
-      </p>
-    </section>
-  </main>
-
-  <footer class="footer">
-    <span id="status">Ready</span>
-  </footer>
+    </div>
+  </section>
 
   <script src="app.js"></script>
 </body>
