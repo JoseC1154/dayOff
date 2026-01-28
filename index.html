@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="theme-color" content="#0b1220" />
-  <title>Day-Off 30-Day Calculator</title>
+  <title>Day-Off Request Calculator</title>
 
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="styles.css" />
@@ -12,10 +12,41 @@
 <body>
   <header class="header">
     <h1>Day-Off Request Calculator</h1>
-    <p>30 days in advance + 2-day early reminder</p>
+    <p><span id="ruleText">30 days in advance + 2-day early reminder</span></p>
   </header>
 
   <main class="wrap">
+    <!-- SETTINGS -->
+    <section class="card">
+      <h2>Settings</h2>
+      <div class="grid settingsGrid">
+        <div class="field">
+          <label>Days in advance (policy)</label>
+          <input id="advanceDays" type="number" min="0" step="1" inputmode="numeric" />
+        </div>
+
+        <div class="field">
+          <label>Extra early days (reminder)</label>
+          <input id="earlyExtraDays" type="number" min="0" step="1" inputmode="numeric" />
+        </div>
+
+        <div class="result">
+          <div class="k">Early reminder offset</div>
+          <div class="v" id="earlyOffsetText">—</div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="saveSettingsBtn" type="button">Save settings</button>
+        <button id="resetSettingsBtn" class="danger" type="button">Reset defaults</button>
+      </div>
+
+      <p class="hint">
+        Settings are saved to this device (localStorage).
+      </p>
+    </section>
+
+    <!-- TODAY => DAY OFF -->
     <section class="card">
       <h2>Submit today → What day-off date does that allow?</h2>
       <div class="grid">
@@ -25,12 +56,20 @@
         </div>
 
         <div class="result">
-          <div class="k">Day-off date (today + 30)</div>
-          <div class="v" id="todayPlus30">—</div>
+          <div class="k">Day-off date (today + advance)</div>
+          <div class="v" id="todayPlusAdvance">—</div>
+        </div>
+
+        <div class="result">
+          <div class="k">Calendar export</div>
+          <div class="v">
+            <button id="exportDayOffFromTodayBtn" type="button">Export Day-off (.ics)</button>
+          </div>
         </div>
       </div>
     </section>
 
+    <!-- DAY OFF => DEADLINES -->
     <section class="card">
       <h2>Pick a day-off date → When must you submit?</h2>
 
@@ -41,26 +80,33 @@
         </div>
 
         <div class="result">
-          <div class="k">Submit by (day off − 30)</div>
+          <div class="k">Submit by (day off − advance)</div>
           <div class="v" id="submitBy">—</div>
         </div>
 
         <div class="result">
-          <div class="k">Early reminder (day off − 32)</div>
+          <div class="k">Early reminder (day off − (advance + extra))</div>
           <div class="v" id="earlyReminder">—</div>
         </div>
       </div>
 
-      <div class="actions">
+      <div class="actions exportRow">
         <input id="label" type="text" placeholder="Label (optional) e.g., 'Family trip'" />
         <button id="saveBtn" type="button">Save this day-off date</button>
       </div>
 
+      <div class="actions exportRow">
+        <button id="exportDayOffBtn" type="button">Export Day-off (.ics)</button>
+        <button id="exportSubmitByBtn" type="button">Export Submit-by (.ics)</button>
+        <button id="exportEarlyBtn" type="button">Export Early reminder (.ics)</button>
+      </div>
+
       <p class="hint">
-        Tip: Saved items stay on this device using localStorage (no login needed).
+        Calendar exports download a file you can open to add the reminder to Apple/Google Calendar.
       </p>
     </section>
 
+    <!-- SAVED -->
     <section class="card">
       <h2>Saved dates</h2>
       <div id="savedList" class="list"></div>
@@ -72,8 +118,7 @@
     <section class="card small">
       <h2>Install</h2>
       <p>
-        On mobile/desktop browser: use <b>Add to Home Screen</b> / <b>Install app</b>.
-        Works offline after first load.
+        Use <b>Install app</b> / <b>Add to Home Screen</b>. Works offline after first load.
       </p>
     </section>
   </main>
