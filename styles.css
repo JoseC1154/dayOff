@@ -6,6 +6,8 @@
   --line:rgba(255,255,255,0.08);
   --accent:rgba(122,162,255,0.22);
   --danger:rgba(255,107,107,0.20);
+  --topbar-h: 72px;
+  --footer-h: 44px;
 }
 
 *{box-sizing:border-box}
@@ -29,7 +31,7 @@ body{
   align-items:center;
   justify-content:space-between;
   gap:12px;
-  height: 72px;
+  height: var(--topbar-h);
 }
 
 .brand .title{font-weight:800; font-size:18px}
@@ -147,6 +149,7 @@ input[type="date"], input[type="text"], input[type="number"]{
   backdrop-filter:blur(10px);
   color:var(--muted);
   font-size:12px;
+  height: var(--footer-h);
 }
 
 /* Modal system */
