@@ -50,6 +50,9 @@ body{
   flex-direction: column;
 }
 
+.home .hero{
+  margin: auto 0;                 /* vertical centering */
+}
 
 .card{
   background:rgba(18,26,43,0.92);
