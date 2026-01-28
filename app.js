@@ -52,6 +52,10 @@ submitBySub: $("submitBySub"),
   // Saved list
   savedList: $("savedList"),
   clearAllBtn: $("clearAllBtn"),
+  
+  openSaved: $("openSaved"),
+  modalSaved: $("modalSaved"),
+
 };
 
 const STORAGE_KEY = "dayoff_saved_v1";
@@ -338,9 +342,13 @@ function useSavedItem(id){
   els.label.value = item.label || "";
   computeFromDayOff();
 
+  // Close Saved modal then open Pick modal
+  closeModal();
   showModal(els.modalPickDayOff);
+
   setStatus("Loaded saved date.");
 }
+
 
 function clearAllSaved(){
   localStorage.removeItem(STORAGE_KEY);
@@ -401,6 +409,12 @@ function init(){
   computeFromDayOff();
   renderSaved();
   registerSW();
+
+  els.openSaved.addEventListener("click", () => {
+  renderSaved();
+  showModal(els.modalSaved);
+});
+
 
   // open modals
   els.btnSubmitToday.addEventListener("click", () => {
