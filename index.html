@@ -76,10 +76,12 @@
         <input id="today" type="date" />
       </div>
 
-      <div class="resultBox">
-        <div class="k">Day-off date (today + advance)</div>
-        <div class="v" id="todayPlusAdvance">—</div>
-      </div>
+    <div class="heroResult" aria-live="polite">
+      <div class="heroLabel">Your day-off date</div>
+      <div class="heroValue" id="todayPlusAdvanceHero">—</div>
+      <div class="heroSub" id="todayPlusAdvanceSub">Based on today + advance days</div>
+    </div>
+
 
       <div class="row">
         <button id="exportDayOffFromTodayBtn" type="button">Export Day-off (.ics)</button>
@@ -103,15 +105,17 @@
         <input id="dayOffDate" type="date" />
       </div>
 
-      <div class="resultBox">
-        <div class="k">Submit by (day off − advance)</div>
-        <div class="v" id="submitBy">—</div>
-      </div>
+         <div class="heroResult" aria-live="polite">
+      <div class="heroLabel">Submit your request by</div>
+      <div class="heroValue" id="submitByHero">—</div>
+      <div class="heroSub" id="submitBySub">Day off − advance days</div>
+    </div>
+    
+    <div class="resultBox">
+      <div class="k">Early reminder</div>
+      <div class="v" id="earlyReminder">—</div>
+    </div>
 
-      <div class="resultBox">
-        <div class="k">Early reminder (day off − (advance + extra))</div>
-        <div class="v" id="earlyReminder">—</div>
-      </div>
 
       <div class="field">
         <label>Label (optional)</label>
