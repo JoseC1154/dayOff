@@ -29,7 +29,9 @@ body{
   align-items:center;
   justify-content:space-between;
   gap:12px;
+  height: 72px;
 }
+
 .brand .title{font-weight:800; font-size:18px}
 .brand .subtitle{margin-top:4px; color:var(--muted); font-size:12px}
 
@@ -42,16 +44,13 @@ body{
 
 /* Home layout */
 .home{
-  min-height: 100vh;              /* full screen height */
+  min-height: calc(100vh - 72px);  /* subtract topbar height */
   max-width: 980px;
   margin: 0 auto;
   padding: 0 16px;
   display: flex;
   flex-direction: column;
-}
-
-.home .hero{
-  margin: auto 0;                 /* vertical centering */
+  justify-content: center; 
 }
 
 .card{
