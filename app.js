@@ -22,6 +22,15 @@ const els = {
   exportDayOffFromTodayBtn: $("exportDayOffFromTodayBtn"),
   submitRuleText: $("submitRuleText"),
 
+  // Submit Today hero
+todayPlusAdvanceHero: $("todayPlusAdvanceHero"),
+todayPlusAdvanceSub: $("todayPlusAdvanceSub"),
+
+// Pick Day Off hero
+submitByHero: $("submitByHero"),
+submitBySub: $("submitBySub"),
+
+
   // Modal: Pick Day Off
   dayOffDate: $("dayOffDate"),
   submitBy: $("submitBy"),
@@ -126,24 +135,44 @@ function applySettingsToUI(){
 function computeFromToday(){
   const s = loadSettings();
   const base = parseInputDate(els.today.value);
-  if(!base){ els.todayPlusAdvance.textContent="—"; return; }
+
+  if(!base){
+    els.todayPlusAdvanceHero.textContent = "—";
+    els.todayPlusAdvanceSub.textContent = `Based on today + ${s.advanceDays} days`;
+    return;
+  }
+
   const dayOff = addDays(base, s.advanceDays);
-  els.todayPlusAdvance.textContent = `${fmtLong(dayOff)} (${toInputDateValue(dayOff)})`;
+  els.todayPlusAdvanceHero.textContent = fmtLong(dayOff);
+  els.todayPlusAdvanceSub.textContent = `${toInputDateValue(dayOff)} (today + ${s.advanceDays})`;
 }
+
 
 function computeFromDayOff(){
   const s = loadSettings();
   const dayOff = parseInputDate(els.dayOffDate.value);
+
+  // Update helper text always
+  els.submitBySub.textContent = `Day off − ${s.advanceDays} days`;
+
   if(!dayOff){
-    els.submitBy.textContent="—";
-    els.earlyReminder.textContent="—";
+    els.submitByHero.textContent = "—";
+    els.earlyReminder.textContent = "—";
     return;
   }
+
   const submitBy = addDays(dayOff, -s.advanceDays);
-  const early = addDays(dayOff, -(s.advanceDays + s.earlyExtraDays));
-  els.submitBy.textContent = `${fmtLong(submitBy)} (${toInputDateValue(submitBy)})`;
+  const earlyOffset = s.advanceDays + s.earlyExtraDays;
+  const early = addDays(dayOff, -earlyOffset);
+
+  // HERO: Submit-by
+  els.submitByHero.textContent = fmtLong(submitBy);
+  els.submitBySub.textContent = `${toInputDateValue(submitBy)} (deadline)`;
+
+  // Secondary: Early reminder
   els.earlyReminder.textContent = `${fmtLong(early)} (${toInputDateValue(early)})`;
 }
+
 
 /* ---------- modal system ---------- */
 let openModalEl = null;
