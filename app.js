@@ -360,17 +360,31 @@ function renderSaved(){
   const s = loadSettings();
   const items = loadSaved().sort((a,b)=> a.dayOff > b.dayOff ? 1 : -1);
 
+  // Safety: if the container is missing, don't crash
+  if (!els.savedList) return;
+
   els.savedList.innerHTML = "";
 
+  // Empty state message
   if(items.length === 0){
-    els.savedList.innerHTML = `<div class="item"><div class="itemMeta">No saved dates yet.</div></div>`;
+    els.savedList.innerHTML = `
+      <div class="item">
+        <div class="itemTitle">Nothing saved yet</div>
+        <div class="itemMeta">Save a day-off date in “Pick a day-off date” to see it here.</div>
+      </div>
+    `;
     return;
   }
 
   for(const item of items){
     const dayOff = parseInputDate(item.dayOff);
+
+    // If an item is corrupted, skip it gracefully
+    if(!dayOff) continue;
+
     const submitBy = addDays(dayOff, -s.advanceDays);
     const early = addDays(dayOff, -(s.advanceDays + s.earlyExtraDays));
+
     const title = item.label?.trim() ? item.label.trim() : "Day off";
 
     const div = document.createElement("div");
@@ -387,6 +401,7 @@ function renderSaved(){
         <button type="button" class="danger" data-action="delete" data-id="${item.id}">Delete</button>
       </div>
     `;
+
     els.savedList.appendChild(div);
   }
 }
