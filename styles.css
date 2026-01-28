@@ -235,6 +235,11 @@ input[type="date"], input[type="text"], input[type="number"]{
   font-size: 14px;
   font-weight: 800;
 }
+/* Saved modal spacing */
+#modalSaved .list {
+  margin-top: 4px;
+}
+
 
 .resultBox .k{font-size:12px; color:var(--muted)}
 .resultBox .v{margin-top:4px; font-size:16px; font-weight:800}
