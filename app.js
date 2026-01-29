@@ -175,13 +175,8 @@ function computeFromDayOff(){
   const earlyOffset = s.advanceDays + s.earlyExtraDays;
   const early = addDays(dayOff, -earlyOffset);
 
-  // Check if early reminder window was missed
-  const earlyReminderDaysAhead = earlyOffset; // e.g., 32 days
-  const earlyWindowMissed = dayOff < addDays(today, earlyReminderDaysAhead);
-  
-  if(earlyWindowMissed){
-    showToast(`⚠️ Early reminder window missed (${earlyReminderDaysAhead} days). Submit by deadline still valid.`, 5000);
-  }
+  // Check if early reminder date has passed (but still within submit-by window)
+  const earlyDatePassed = early < today;
 
   // HERO: Submit-by
   const daysUntilSubmit = Math.ceil((submitBy - today) / (1000 * 60 * 60 * 24));
@@ -190,16 +185,26 @@ function computeFromDayOff(){
   els.submitByHero.textContent = fmtLong(submitBy);
   els.submitBySub.textContent = `${toInputDateValue(submitBy)} (${daysUntilSubmit} days) • Day off in ${daysUntilDayOff} days`;
 
-  // Update button text with days until early
+  // Update reminders button text with days info
   if(daysUntilEarly > 0){
-    els.exportEarlyBtn.textContent = `Submit in ${daysUntilEarly} days (Early) .ics`;
+    els.exportRemindersBtn.textContent = `Submission reminders (${daysUntilEarly} & ${daysUntilSubmit} days) .ics`;
+  } else if(daysUntilSubmit > 0){
+    els.exportRemindersBtn.textContent = `Submission reminders (${daysUntilSubmit} days) .ics`;
   } else {
-    els.exportEarlyBtn.textContent = `Early get stamped reminder .ics`;
+    els.exportRemindersBtn.textContent = `Submission reminders .ics`;
   }
 
   // Secondary: Early reminder
-  if(earlyWindowMissed){
-    els.earlyReminder.textContent = `⚠️ Missed: ${fmtLong(early)}`;
+  if(earlyDatePassed){
+    // Show how many days early they still have (days until the deadline)
+    const daysEarlyRemaining = daysUntilSubmit;
+    if(daysEarlyRemaining > 1){
+      els.earlyReminder.textContent = `${fmtLong(early)} (${toInputDateValue(early)}) • ${daysEarlyRemaining} days early`;
+    } else if(daysEarlyRemaining === 1){
+      els.earlyReminder.textContent = `${fmtLong(early)} (${toInputDateValue(early)}) • 1 day early`;
+    } else {
+      els.earlyReminder.textContent = `${fmtLong(early)} (${toInputDateValue(early)}) • Deadline today`;
+    }
   } else {
     els.earlyReminder.textContent = `${fmtLong(early)} (${toInputDateValue(early)})`;
   }
@@ -248,6 +253,61 @@ function wireModalClose(){
 /* ---------- calendar export (.ics) ---------- */
 function yyyymmdd(date){
   return `${date.getFullYear()}${pad2(date.getMonth()+1)}${pad2(date.getDate())}`;
+}
+
+function makeIcsMultiEvent(events){
+  const dtstamp = new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d{3}Z$/,"Z");
+  
+  const esc = (s) => String(s || "")
+    .replaceAll("\\","\\\\")
+    .replaceAll("\n","\\n")
+    .replaceAll(",","\\,")
+    .replaceAll(";","\\;");
+
+  let icsContent = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//DayOffPWA//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+  ];
+
+  for(const event of events){
+    const uid = (crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)) + "@dayoffpwa";
+    
+    let dtstart, dtend;
+    if(event.time){
+      // Timed event
+      const [hours, minutes] = event.time.split(':').map(Number);
+      const startDateTime = new Date(event.date);
+      startDateTime.setHours(hours, minutes, 0, 0);
+      const endDateTime = new Date(startDateTime);
+      endDateTime.setHours(hours + 1, minutes, 0, 0);
+      
+      dtstart = `DTSTART:${yyyymmdd(startDateTime)}T${pad2(hours)}${pad2(minutes)}00`;
+      dtend = `DTEND:${yyyymmdd(endDateTime)}T${pad2(hours + 1)}${pad2(minutes)}00`;
+    } else {
+      // All-day event
+      const start = yyyymmdd(event.date);
+      const end = yyyymmdd(addDays(event.date, 1));
+      dtstart = `DTSTART;VALUE=DATE:${start}`;
+      dtend = `DTEND;VALUE=DATE:${end}`;
+    }
+
+    icsContent.push(
+      "BEGIN:VEVENT",
+      `UID:${uid}`,
+      `DTSTAMP:${dtstamp}`,
+      `SUMMARY:${esc(event.title)}`,
+      `DESCRIPTION:${esc(event.description)}`,
+      dtstart,
+      dtend,
+      "END:VEVENT"
+    );
+  }
+
+  icsContent.push("END:VCALENDAR");
+  return icsContent.join("\r\n");
 }
 
 function makeIcsAllDayEvent({ title, description, date, time }){
@@ -345,6 +405,52 @@ function exportEventForDate({ kind, label, dayOffDateStr }){
 
   downloadIcs(filename, ics);
   setStatus("Calendar export downloaded.");
+}
+
+function exportRemindersForDate({ label, dayOffDateStr }){
+  const s = loadSettings();
+  const dayOff = parseInputDate(dayOffDateStr);
+  if(!dayOff){ setStatus("Pick a valid day-off date."); return; }
+
+  const submitBy = addDays(dayOff, -s.advanceDays);
+  const earlyOffset = s.advanceDays + s.earlyExtraDays;
+  const early = addDays(dayOff, -earlyOffset);
+
+  const events = [];
+
+  // Event 1: Early reminder to submit paperwork
+  events.push({
+    title: label?.trim() ? `${label.trim()} — Submit paperwork (early)` : "Submit paperwork (early)",
+    description: [
+      `Early reminder: ${toInputDateValue(early)}`,
+      `Submit paperwork ${s.earlyExtraDays} days before deadline`,
+      `Day-off date: ${toInputDateValue(dayOff)}`,
+      `Deadline: ${toInputDateValue(submitBy)}`,
+    ].join("\n"),
+    date: early,
+    time: s.earlyTime
+  });
+
+  // Event 2: Deadline to get form stamped
+  events.push({
+    title: label?.trim() ? `${label.trim()} — Get form stamped (deadline)` : "Get form stamped (deadline)",
+    description: [
+      `Deadline: ${toInputDateValue(submitBy)}`,
+      `Get submitted form stamped by this date`,
+      `Day-off date: ${toInputDateValue(dayOff)}`,
+      `Policy: ${s.advanceDays} days in advance`,
+    ].join("\n"),
+    date: submitBy,
+    time: s.submitByTime
+  });
+
+  const ics = makeIcsMultiEvent(events);
+
+  const safeLabel = (label?.trim() ? label.trim().slice(0,24).replace(/[^\w\-]+/g,"_") + "_" : "");
+  const filename = `${safeLabel}reminders_${toInputDateValue(dayOff)}.ics`;
+
+  downloadIcs(filename, ics);
+  setStatus("Reminders calendar export downloaded.");
 }
 
 /* ---------- saved items ---------- */
@@ -448,6 +554,8 @@ function renderSaved(){
     today.setHours(0, 0, 0, 0);
     const submitByStillValid = submitBy >= today;
     const earlyStillValid = early >= today;
+    // Show reminders button if at least the submit-by date is still valid
+    const showReminders = !item.submitted && submitByStillValid;
     
     // Status badge
     const statusBadge = item.submitted 
@@ -466,8 +574,7 @@ function renderSaved(){
           ${item.submitted ? '✓ Submitted' : 'Mark as Submitted'}
         </button>
         ${item.submitted ? '<button type="button" data-action="ics-dayoff" data-id="' + item.id + '">Day-off .ics</button>' : ''}
-        ${!item.submitted && submitByStillValid ? '<button type="button" data-action="ics-submit" data-id="' + item.id + '">Get stamped reminder .ics</button>' : ''}
-        ${!item.submitted && earlyStillValid ? '<button type="button" data-action="ics-early" data-id="' + item.id + '">Early .ics</button>' : ''}
+        ${showReminders ? '<button type="button" data-action="ics-reminders" data-id="' + item.id + '">Submission reminders .ics</button>' : ''}
         <button type="button" class="danger" data-action="delete" data-id="${item.id}">Delete</button>
       </div>
     `;
@@ -525,8 +632,7 @@ function init(){
     label: $("label"),
     saveBtn: $("saveBtn"),
     exportDayOffBtn: $("exportDayOffBtn"),
-    exportSubmitByBtn: $("exportSubmitByBtn"),
-    exportEarlyBtn: $("exportEarlyBtn"),
+    exportRemindersBtn: $("exportRemindersBtn"),
     pickRuleText: $("pickRuleText"),
 
     // Settings modal
@@ -659,11 +765,8 @@ function init(){
   els.exportDayOffBtn.addEventListener("click", () => {
     exportEventForDate({ kind:"dayOff", label: els.label.value, dayOffDateStr: els.dayOffDate.value });
   });
-  els.exportSubmitByBtn.addEventListener("click", () => {
-    exportEventForDate({ kind:"submitBy", label: els.label.value, dayOffDateStr: els.dayOffDate.value });
-  });
-  els.exportEarlyBtn.addEventListener("click", () => {
-    exportEventForDate({ kind:"early", label: els.label.value, dayOffDateStr: els.dayOffDate.value });
+  els.exportRemindersBtn.addEventListener("click", () => {
+    exportRemindersForDate({ label: els.label.value, dayOffDateStr: els.dayOffDate.value });
   });
 
   // save day off
@@ -720,8 +823,7 @@ function init(){
     if(!item) return;
 
     if(action === "ics-dayoff") return exportEventForDate({ kind:"dayOff", label:item.label, dayOffDateStr:item.dayOff, isSubmitted:item.submitted });
-    if(action === "ics-submit") return exportEventForDate({ kind:"submitBy", label:item.label, dayOffDateStr:item.dayOff, isSubmitted:item.submitted });
-    if(action === "ics-early") return exportEventForDate({ kind:"early", label:item.label, dayOffDateStr:item.dayOff, isSubmitted:item.submitted });
+    if(action === "ics-reminders") return exportRemindersForDate({ label:item.label, dayOffDateStr:item.dayOff });
   });
 
   els.clearAllBtn.addEventListener("click", clearAllSaved);
