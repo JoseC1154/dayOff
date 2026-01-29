@@ -7,7 +7,12 @@ let els = {};
 const STORAGE_KEY = "dayoff_saved_v1";
 const SETTINGS_KEY = "dayoff_settings_v1";
 
-const DEFAULT_SETTINGS = { advanceDays: 30, earlyExtraDays: 2 };
+const DEFAULT_SETTINGS = { 
+  advanceDays: 30, 
+  earlyExtraDays: 2,
+  submitByTime: "09:00",
+  earlyTime: "09:00"
+};
 
 /* ---------- utils ---------- */
 function setStatus(msg) { els.status.textContent = msg; }
@@ -70,10 +75,12 @@ function loadSettings(){
 
     let advanceDays = Number.isFinite(parsed?.advanceDays) ? parsed.advanceDays : DEFAULT_SETTINGS.advanceDays;
     let earlyExtraDays = Number.isFinite(parsed?.earlyExtraDays) ? parsed.earlyExtraDays : DEFAULT_SETTINGS.earlyExtraDays;
+    let submitByTime = parsed?.submitByTime || DEFAULT_SETTINGS.submitByTime;
+    let earlyTime = parsed?.earlyTime || DEFAULT_SETTINGS.earlyTime;
 
     advanceDays = Math.max(0, Math.floor(advanceDays));
     earlyExtraDays = Math.max(0, Math.floor(earlyExtraDays));
-    return { advanceDays, earlyExtraDays };
+    return { advanceDays, earlyExtraDays, submitByTime, earlyTime };
   }catch{
     return { ...DEFAULT_SETTINGS };
   }
@@ -87,6 +94,8 @@ function applySettingsToUI(){
   const s = loadSettings();
   els.advanceDays.value = String(s.advanceDays);
   els.earlyExtraDays.value = String(s.earlyExtraDays);
+  els.submitByTime.value = s.submitByTime;
+  els.earlyTime.value = s.earlyTime;
 
   const earlyOffset = s.advanceDays + s.earlyExtraDays;
   els.earlyOffsetText.textContent = `${earlyOffset} days before day-off`;
@@ -109,8 +118,19 @@ function computeFromToday(){
   }
 
   const dayOff = addDays(base, s.advanceDays);
+  const daysUntil = Math.ceil((dayOff - base) / (1000 * 60 * 60 * 24));
   els.todayPlusAdvanceHero.textContent = fmtLong(dayOff);
-  els.todayPlusAdvanceSub.textContent = `${toInputDateValue(dayOff)} (today + ${s.advanceDays})`;
+  els.todayPlusAdvanceSub.textContent = `${toInputDateValue(dayOff)} (${daysUntil} days from today)`;
+  
+  // Check if this date has been saved and submitted
+  const dayOffStr = toInputDateValue(dayOff);
+  const saved = loadSaved();
+  const item = saved.find(x => x.dayOff === dayOffStr);
+  if(item && item.submitted){
+    els.exportDayOffFromTodayBtn.hidden = false;
+  } else {
+    els.exportDayOffFromTodayBtn.hidden = true;
+  }
 }
 
 
@@ -164,8 +184,18 @@ function computeFromDayOff(){
   }
 
   // HERO: Submit-by
+  const daysUntilSubmit = Math.ceil((submitBy - today) / (1000 * 60 * 60 * 24));
+  const daysUntilDayOff = Math.ceil((dayOff - today) / (1000 * 60 * 60 * 24));
+  const daysUntilEarly = Math.ceil((early - today) / (1000 * 60 * 60 * 24));
   els.submitByHero.textContent = fmtLong(submitBy);
-  els.submitBySub.textContent = `${s.advanceDays} days before day-off (deadline)`;
+  els.submitBySub.textContent = `${toInputDateValue(submitBy)} (${daysUntilSubmit} days) • Day off in ${daysUntilDayOff} days`;
+
+  // Update button text with days until early
+  if(daysUntilEarly > 0){
+    els.exportEarlyBtn.textContent = `Submit in ${daysUntilEarly} days (Early) .ics`;
+  } else {
+    els.exportEarlyBtn.textContent = `Early get stamped reminder .ics`;
+  }
 
   // Secondary: Early reminder
   if(earlyWindowMissed){
@@ -220,9 +250,7 @@ function yyyymmdd(date){
   return `${date.getFullYear()}${pad2(date.getMonth()+1)}${pad2(date.getDate())}`;
 }
 
-function makeIcsAllDayEvent({ title, description, date }){
-  const start = yyyymmdd(date);
-  const end = yyyymmdd(addDays(date, 1));
+function makeIcsAllDayEvent({ title, description, date, time }){
   const dtstamp = new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d{3}Z$/,"Z");
   const uid = (crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)) + "@dayoffpwa";
 
@@ -231,6 +259,25 @@ function makeIcsAllDayEvent({ title, description, date }){
     .replaceAll("\n","\\n")
     .replaceAll(",","\\,")
     .replaceAll(";","\\;");
+
+  let dtstart, dtend;
+  if(time){
+    // Timed event
+    const [hours, minutes] = time.split(':').map(Number);
+    const startDateTime = new Date(date);
+    startDateTime.setHours(hours, minutes, 0, 0);
+    const endDateTime = new Date(startDateTime);
+    endDateTime.setHours(hours + 1, minutes, 0, 0); // 1 hour duration
+    
+    dtstart = `DTSTART:${yyyymmdd(startDateTime)}T${pad2(hours)}${pad2(minutes)}00`;
+    dtend = `DTEND:${yyyymmdd(endDateTime)}T${pad2(hours + 1)}${pad2(minutes)}00`;
+  } else {
+    // All-day event
+    const start = yyyymmdd(date);
+    const end = yyyymmdd(addDays(date, 1));
+    dtstart = `DTSTART;VALUE=DATE:${start}`;
+    dtend = `DTEND;VALUE=DATE:${end}`;
+  }
 
   return [
     "BEGIN:VCALENDAR",
@@ -243,8 +290,8 @@ function makeIcsAllDayEvent({ title, description, date }){
     `DTSTAMP:${dtstamp}`,
     `SUMMARY:${esc(title)}`,
     `DESCRIPTION:${esc(description)}`,
-    `DTSTART;VALUE=DATE:${start}`,
-    `DTEND;VALUE=DATE:${end}`,
+    dtstart,
+    dtend,
     "END:VEVENT",
     "END:VCALENDAR",
   ].join("\r\n");
@@ -269,14 +316,17 @@ function exportEventForDate({ kind, label, dayOffDateStr }){
 
   let eventDate = dayOff;
   let title = label?.trim() ? `${label.trim()} — Day off` : "Day off";
+  let time = null; // null = all-day event
 
   if(kind === "submitBy"){
     eventDate = addDays(dayOff, -s.advanceDays);
-    title = label?.trim() ? `${label.trim()} — Submit day-off request` : "Submit day-off request";
+    title = label?.trim() ? `${label.trim()} — Get form stamped (deadline)` : "Get form stamped (deadline)";
+    time = s.submitByTime;
   }else if(kind === "early"){
     const offset = s.advanceDays + s.earlyExtraDays;
     eventDate = addDays(dayOff, -offset);
-    title = label?.trim() ? `${label.trim()} — Early reminder to submit` : "Early reminder to submit";
+    title = label?.trim() ? `${label.trim()} — Early reminder to get stamped` : "Early reminder to get stamped";
+    time = s.earlyTime;
   }
 
   const descLines = [
@@ -284,10 +334,10 @@ function exportEventForDate({ kind, label, dayOffDateStr }){
     `Policy: submit ${s.advanceDays} days in advance`,
     `Extra early days: ${s.earlyExtraDays}`,
   ];
-  if(kind === "submitBy") descLines.unshift(`Submit-by deadline: ${toInputDateValue(eventDate)}`);
-  if(kind === "early") descLines.unshift(`Early reminder date: ${toInputDateValue(eventDate)}`);
+  if(kind === "submitBy") descLines.unshift(`Get form stamped by: ${toInputDateValue(eventDate)}`);
+  if(kind === "early") descLines.unshift(`Early reminder: ${toInputDateValue(eventDate)}`);
 
-  const ics = makeIcsAllDayEvent({ title, description: descLines.join("\n"), date: eventDate });
+  const ics = makeIcsAllDayEvent({ title, description: descLines.join("\n"), date: eventDate, time });
 
   const safeKind = kind === "dayOff" ? "dayoff" : kind;
   const safeLabel = (label?.trim() ? label.trim().slice(0,24).replace(/[^\w\-]+/g,"_") + "_" : "");
@@ -392,18 +442,32 @@ function renderSaved(){
     const early = addDays(dayOff, -(s.advanceDays + s.earlyExtraDays));
 
     const title = item.label?.trim() ? item.label.trim() : "Day off";
+    
+    // Check if dates are still in the future
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const submitByStillValid = submitBy >= today;
+    const earlyStillValid = early >= today;
+    
+    // Status badge
+    const statusBadge = item.submitted 
+      ? '<span style="color: #4ade80; font-weight: 600; margin-left: 0.5rem;">✓ Submitted</span>'
+      : '<span style="color: #fbbf24; font-weight: 600; margin-left: 0.5rem;">⏳ Pending</span>';
 
     const div = document.createElement("div");
     div.className = "item";
     div.innerHTML = `
-      <div class="itemTitle">${escapeHtml(title)} — ${fmtLong(dayOff)} (${item.dayOff})</div>
+      <div class="itemTitle">${escapeHtml(title)} — ${fmtLong(dayOff)} (${item.dayOff})${statusBadge}</div>
       <div class="itemMeta">Submit by: ${fmtLong(submitBy)} (${toInputDateValue(submitBy)})</div>
       <div class="itemMeta">Early: ${fmtLong(early)} (${toInputDateValue(early)})</div>
       <div class="itemBtns">
         <button type="button" data-action="use" data-id="${item.id}">Open</button>
-        <button type="button" data-action="ics-dayoff" data-id="${item.id}">Day-off .ics</button>
-        <button type="button" data-action="ics-submit" data-id="${item.id}">Submit-by .ics</button>
-        <button type="button" data-action="ics-early" data-id="${item.id}">Early .ics</button>
+        <button type="button" data-action="toggle-submit" data-id="${item.id}" style="background: ${item.submitted ? '#4ade80' : '#fbbf24'}; color: #000;">
+          ${item.submitted ? '✓ Submitted' : 'Mark as Submitted'}
+        </button>
+        ${item.submitted ? '<button type="button" data-action="ics-dayoff" data-id="' + item.id + '">Day-off .ics</button>' : ''}
+        ${!item.submitted && submitByStillValid ? '<button type="button" data-action="ics-submit" data-id="' + item.id + '">Get stamped reminder .ics</button>' : ''}
+        ${!item.submitted && earlyStillValid ? '<button type="button" data-action="ics-early" data-id="' + item.id + '">Early .ics</button>' : ''}
         <button type="button" class="danger" data-action="delete" data-id="${item.id}">Delete</button>
       </div>
     `;
@@ -441,6 +505,8 @@ function init(){
     // Modal: Submit Today
     today: $("today"),
     todayPlusAdvance: $("todayPlusAdvance"),
+    labelFromToday: $("labelFromToday"),
+    saveTodayBtn: $("saveTodayBtn"),
     exportDayOffFromTodayBtn: $("exportDayOffFromTodayBtn"),
     submitRuleText: $("submitRuleText"),
 
@@ -466,6 +532,8 @@ function init(){
     // Settings modal
     advanceDays: $("advanceDays"),
     earlyExtraDays: $("earlyExtraDays"),
+    submitByTime: $("submitByTime"),
+    earlyTime: $("earlyTime"),
     earlyOffsetText: $("earlyOffsetText"),
     saveSettingsBtn: $("saveSettingsBtn"),
     resetSettingsBtn: $("resetSettingsBtn"),
@@ -519,7 +587,9 @@ function init(){
   els.saveSettingsBtn.addEventListener("click", () => {
     const advanceDays = Math.max(0, Math.floor(Number(els.advanceDays.value || 0)));
     const earlyExtraDays = Math.max(0, Math.floor(Number(els.earlyExtraDays.value || 0)));
-    saveSettings({ advanceDays, earlyExtraDays });
+    const submitByTime = els.submitByTime.value || "09:00";
+    const earlyTime = els.earlyTime.value || "09:00";
+    saveSettings({ advanceDays, earlyExtraDays, submitByTime, earlyTime });
 
     applySettingsToUI();
     computeFromToday();
@@ -538,12 +608,52 @@ function init(){
   });
 
   // exports
+  els.saveTodayBtn.addEventListener("click", () => {
+    const s = loadSettings();
+    const base = parseInputDate(els.today.value);
+    
+    if(!base){
+      showToast("⚠️ Please select today's date first");
+      setStatus("Pick a valid date.");
+      return;
+    }
+    
+    const dayOff = addDays(base, s.advanceDays);
+    const dayOffStr = toInputDateValue(dayOff);
+    
+    // Validate the resulting day-off date
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if(dayOff < today){
+      showToast("⚠️ Cannot save: This date has already passed", 4000);
+      return;
+    }
+    
+    const minDate = addDays(today, 14);
+    
+    if(dayOff < minDate){
+      showToast("⚠️ Cannot save: Missed day-off request window (minimum 14 days notice)", 4000);
+      return;
+    }
+    
+    const success = addSavedItem(dayOffStr, els.labelFromToday.value);
+    
+    if(success){
+      closeModal();
+      showToast("✓ Date saved successfully! Click folder icon to view.", 4000);
+      setStatus("Date saved. Click folder icon to view.");
+    } else {
+      showToast("⚠️ This date is already saved");
+    }
+  });
+
   els.exportDayOffFromTodayBtn.addEventListener("click", () => {
     const s = loadSettings();
     const base = parseInputDate(els.today.value);
     if(!base) return setStatus("Pick a valid 'today' date.");
     const dayOff = addDays(base, s.advanceDays);
-    exportEventForDate({ kind:"dayOff", label:"Day off (from today)", dayOffDateStr: toInputDateValue(dayOff) });
+    exportEventForDate({ kind:"dayOff", label: els.labelFromToday.value || "Day off (from today)", dayOffDateStr: toInputDateValue(dayOff) });
   });
 
   els.exportDayOffBtn.addEventListener("click", () => {
@@ -603,14 +713,15 @@ function init(){
     const id = btn.dataset.id;
 
     if(action === "use") return useSavedItem(id);
+    if(action === "toggle-submit") return toggleSubmitted(id);
     if(action === "delete") return deleteSavedItem(id);
 
     const item = loadSaved().find(x => x.id === id);
     if(!item) return;
 
-    if(action === "ics-dayoff") return exportEventForDate({ kind:"dayOff", label:item.label, dayOffDateStr:item.dayOff });
-    if(action === "ics-submit") return exportEventForDate({ kind:"submitBy", label:item.label, dayOffDateStr:item.dayOff });
-    if(action === "ics-early") return exportEventForDate({ kind:"early", label:item.label, dayOffDateStr:item.dayOff });
+    if(action === "ics-dayoff") return exportEventForDate({ kind:"dayOff", label:item.label, dayOffDateStr:item.dayOff, isSubmitted:item.submitted });
+    if(action === "ics-submit") return exportEventForDate({ kind:"submitBy", label:item.label, dayOffDateStr:item.dayOff, isSubmitted:item.submitted });
+    if(action === "ics-early") return exportEventForDate({ kind:"early", label:item.label, dayOffDateStr:item.dayOff, isSubmitted:item.submitted });
   });
 
   els.clearAllBtn.addEventListener("click", clearAllSaved);
