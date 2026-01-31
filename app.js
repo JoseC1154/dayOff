@@ -182,8 +182,17 @@ function computeFromDayOff(){
   const daysUntilSubmit = Math.ceil((submitBy - today) / (1000 * 60 * 60 * 24));
   const daysUntilDayOff = Math.ceil((dayOff - today) / (1000 * 60 * 60 * 24));
   const daysUntilEarly = Math.ceil((early - today) / (1000 * 60 * 60 * 24));
-  els.submitByHero.textContent = fmtLong(submitBy);
-  els.submitBySub.textContent = `${toInputDateValue(submitBy)} (${daysUntilSubmit} days) • Day off in ${daysUntilDayOff} days`;
+  
+  // Update label based on urgency
+  if(daysUntilSubmit >= 7){
+    els.submitByLabel.textContent = "You still have time to submit a request for";
+    els.submitByHero.textContent = fmtLong(dayOff);
+    els.submitBySub.textContent = `${toInputDateValue(dayOff)} (in ${daysUntilDayOff} days) • Deadline: ${fmtLong(submitBy)} (${daysUntilSubmit} days)`;
+  } else {
+    els.submitByLabel.textContent = "Submit your request by";
+    els.submitByHero.textContent = fmtLong(submitBy);
+    els.submitBySub.textContent = `${toInputDateValue(submitBy)} (${daysUntilSubmit} days) • Day off in ${daysUntilDayOff} days`;
+  }
 
   // Update reminders button text with days info
   if(daysUntilEarly > 0){
@@ -624,6 +633,7 @@ function init(){
     // Pick Day Off hero
     submitByHero: $("submitByHero"),
     submitBySub: $("submitBySub"),
+    submitByLabel: $("submitByLabel"),
 
     // Modal: Pick Day Off
     dayOffDate: $("dayOffDate"),
